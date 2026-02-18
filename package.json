@@ -1,0 +1,34 @@
+{
+  "name": "coding-agent-rlm",
+  "version": "0.1.0",
+  "description": "Process large codebases using the RLM (Recursive Language Model) pattern",
+  "bin": {
+    "coding-agent-rlm": "./src/coding-agent-rlm"
+  },
+  "files": [
+    "src/coding-agent-rlm",
+    "SKILL.md",
+    "README.md"
+  ],
+  "keywords": [
+    "cli",
+    "rlm",
+    "claude",
+    "codex",
+    "agent",
+    "llm"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenbase-ai/coding-agent-rlm"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.0",
+    "ultracite": "7.2.3"
+  },
+  "scripts": {
+    "check": "ultracite check",
+    "fix": "ultracite fix"
+  }
+}
