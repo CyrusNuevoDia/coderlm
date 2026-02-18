@@ -1,0 +1,4 @@
+[tools]
+bun = "1"
+just = "1.40"
+python = "3.13"
