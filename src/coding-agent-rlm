@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: coding-agent-rlm <command> <globs...> --prompt <prompt> [--max-depth N]
+
+Process large codebases using the RLM (Recursive Language Model) pattern.
+Instead of feeding all files into context, the agent gets a file listing and
+uses tools to peek, decompose, and recursively process subsets.
+
+Arguments:
+  <command>       Agent to use (claude, codex, or any command)
+  <globs...>      One or more file glob patterns
+  --prompt TEXT   The task for the agent (required)
+  --max-depth N   Recursion limit (default: 3)
+
+Examples:
+  coding-agent-rlm claude "src/**/*.ts" --prompt "Find all TODO comments"
+  coding-agent-rlm claude "src/**" "lib/**" --prompt "Architecture overview"
+  coding-agent-rlm codex "**/*.py" --prompt "Review for security issues"
+EOF
+  exit "${1:-0}"
+}
+
+# --- Argument Parsing ---
+
+[[ $# -eq 0 ]] && usage 0
+[[ "$1" == "--help" || "$1" == "-h" ]] && usage 0
+
+command="$1"; shift
+
+globs=()
+prompt=""
+max_depth=3
+dry_run=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prompt)
+      [[ $# -lt 2 ]] && { echo "Error: --prompt requires a value" >&2; exit 1; }
+      prompt="$2"; shift 2 ;;
+    --max-depth)
+      [[ $# -lt 2 ]] && { echo "Error: --max-depth requires a value" >&2; exit 1; }
+      max_depth="$2"; shift 2 ;;
+    --dry-run)
+      dry_run=true; shift ;;
+    --help|-h)
+      usage 0 ;;
+    -*)
+      echo "Error: unknown option $1" >&2; exit 1 ;;
+    *)
+      globs+=("$1"); shift ;;
+  esac
+done
+
+[[ -z "$prompt" ]] && { echo "Error: --prompt is required" >&2; usage 1; }
+[[ ${#globs[@]} -eq 0 ]] && { echo "Error: at least one glob pattern is required" >&2; usage 1; }
+
+# --- File Listing ---
+
+file_list=""
+for glob in "${globs[@]}"; do
+  if command -v fd &>/dev/null; then
+    file_list+="$(fd --glob "$glob" 2>/dev/null || true)"$'\n'
+  else
+    file_list+="$(find . -path "./$glob" -type f 2>/dev/null | sed 's|^\./||' || true)"$'\n'
+  fi
+done
+
+file_list="$(echo "$file_list" | sort -u | sed '/^$/d')"
+
+if [[ -z "$file_list" ]]; then
+  echo "Warning: no files matched the given patterns" >&2
+fi
+
+# --- System Prompt ---
+
+file_count=$(echo "$file_list" | wc -l | tr -d ' ')
+
+read -r -d '' system_prompt <<SYSPROMPT || true
+You are an RLM (Recursive Language Model). You answer queries about a codebase by interactively exploring files through tool use. Files exist in your environment, NOT in your context window. You must use tools to inspect them.
+
+You will work iteratively: explore, analyze, decompose, and aggregate. Do NOT try to solve everything in one step.
+
+## Files (${file_count} total)
+${file_list}
+
+## Tools
+Prefer these when available:
+- rg (ripgrep) — search file contents by pattern
+- ast-grep (sg) — structural code search (AST-aware)
+- jq — query/transform JSON files
+- qsv — query/transform CSV files
+- head -n N / tail -n N / sed -n 'start,endp' — read file slices
+- fd — find files by name/pattern (faster alternative to find)
+- eza — list files with metadata (sizes, permissions, tree view)
+- wc -l — line counts
+- cat — read entire small files
+
+## Strategy
+
+### 1. EXPLORE FIRST
+Before doing any analysis, understand what you're working with:
+- Check file count and sizes (wc -l) to gauge scope
+- Sample a few files with head to understand structure and conventions
+- Use rg to scan for patterns relevant to your task
+- Do NOT read all files into context — peek strategically
+
+### 2. DECOMPOSE FOR LARGE FILE SETS
+For large file sets (>20 files), break the work into sub-tasks using recursive sub-agent calls:
+  coding-agent-rlm ${command} "<sub-glob>" --prompt "<sub-task>" --max-depth $((max_depth - 1))
+
+Decomposition strategies:
+- By directory: process each top-level directory separately
+- By file type: group .ts, .py, .css, etc. into separate passes
+- By concern: split "find bugs" into "find null-safety issues", "find error handling issues", etc.
+- By size: chunk large file sets into batches of 10-20 files per sub-agent
+
+Each sub-agent gets its own context window and can handle substantial file sets. Don't over-split — analyze the file count and sizes first, then determine if you can cover the scope in a few sub-agent calls rather than many small ones.
+
+### 3. ITERATE AND BUILD UP
+- Write small commands, observe outputs, then decide next steps
+- Save intermediate findings to temp files to accumulate results across steps
+- String matching (rg) finds WHERE things are; sub-agents understand WHAT things mean
+- When results seem wrong or empty, reconsider your approach before continuing
+
+### 4. AGGREGATE AND ANSWER
+- Combine sub-agent results and your own findings into a coherent final answer
+- Explicitly address the original query — don't just dump raw findings
+- If sub-agents returned partial answers, synthesize them
+
+## Constraints
+- Recursion budget: max-depth=${max_depth} (current depth uses 1)
+- Don't read all files at once — peek strategically, then go deeper where needed
+- Prefer rg/sg over reading entire files when searching for specific patterns
+- Minimize redundant work — if a sub-agent already analyzed something, use its results
+SYSPROMPT
+
+# --- Execute Agent ---
+
+run() {
+  if [[ "$dry_run" == true ]]; then
+    printf '%s\0' "$@"
+    exit 0
+  fi
+  exec "$@"
+}
+
+combined_prompt="<instructions>
+${system_prompt}
+</instructions>
+<task>
+${prompt}
+</task>"
+
+if [[ "$command" == *claude* ]]; then
+  run $command -p \
+    --append-system-prompt "$system_prompt" \
+    --allowedTools "Bash" \
+    "$prompt"
+elif [[ "$command" == *codex* ]]; then
+  run $command exec --full-auto "$combined_prompt"
+elif [[ "$command" == *gemini* ]]; then
+  run $command -p "$combined_prompt" --yolo
+else
+  run $command "$combined_prompt"
+fi
