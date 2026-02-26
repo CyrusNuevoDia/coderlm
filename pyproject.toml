@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "coderlm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Process large codebases using the RLM (Recursive Language Model) pattern"
 readme = "README.md"
 license = "MIT"

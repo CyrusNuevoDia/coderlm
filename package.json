@@ -1,9 +1,9 @@
 {
   "name": "coderlm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Process large codebases using the RLM (Recursive Language Model) pattern",
   "bin": {
-    "coderlm": "./src/coderlm"
+    "coderlm": "src/coderlm"
   },
   "files": [
     "src/coderlm",
@@ -23,7 +23,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zenbase-ai/coderlm"
+    "url": "git+https://github.com/zenbase-ai/coderlm.git"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.0",

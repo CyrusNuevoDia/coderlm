@@ -38,26 +38,21 @@ _lint-py:
     ruff format --check
     ruff check
 
-# Publish to npm, pypi, or both (default: all, patch)
-publish target="all" bump="patch":
-    just _bump {{bump}}
-    just _publish-{{target}}
-
-# Bump version in package.json and pyproject.toml
-_bump level:
-    npm version {{level}} --no-git-tag-version
+# Publish current version to npm, pypi, or both (default: all)
+publish target="all":
     #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{target}}" in
+        npm)  npm publish ;;
+        pypi) uv build && uv publish ;;
+        all)  npm publish && uv build && uv publish ;;
+    esac
+
+# Bump version in package.json and pyproject.toml (default: patch)
+bump level="patch":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    npm version {{level}} --no-git-tag-version
     version=$(jq -r .version package.json)
     perl -pi -e "s/^version = .*/version = \"$version\"/" pyproject.toml
     echo "Bumped to $version"
-
-_publish-all:
-    just _publish-npm
-    just _publish-pypi
-
-_publish-npm:
-    npm publish
-
-_publish-pypi:
-    uv build
-    uv publish
