@@ -4,6 +4,10 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
+# Run tests
+test:
+    bun test
+
 # Format code (py, ts, or all)
 fmt target="all":
     just _fmt-{{target}}

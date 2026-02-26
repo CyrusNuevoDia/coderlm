@@ -1,6 +1,6 @@
-# coding-agent-rlm
+# coderlm
 
-Process large codebases with Coding Agents using the **RLM (Recursive Language Model)** pattern.
+Process large codebases with Coding Agents using the **RLM (Recursive Language Model)** pattern — with bundled context guards to keep the agent's output from flooding its own context window.
 
 Instead of stuffing all files into an LLM's context window, give it a file listing and let it use tools to peek, decompose, and recursively call itself on subsets. This keeps each agent focused on a manageable scope while covering arbitrarily large codebases.
 
@@ -8,62 +8,72 @@ Instead of stuffing all files into an LLM's context window, give it a file listi
 
 ```bash
 # npm / bun
-bunx coding-agent-rlm@latest
-npx coding-agent-rlm@latest
+bunx coderlm@latest
+npx coderlm@latest
 
 # pypi
-uvx coding-agent-rlm
-pipx run coding-agent-rlm
+uvx coderlm
+pipx run coderlm
 ```
 
 Or install globally:
 
 ```bash
-npm i -g coding-agent-rlm    # npm
-uv tool install coding-agent-rlm  # pypi
+npm i -g coderlm    # npm
+uv tool install coderlm  # pypi
 ```
 
 ## Usage
 
 ```
-coding-agent-rlm <agent> <globs...> --prompt "<task>" [--max-depth N]
+coderlm <agent> <globs...> --prompt "<task>" [--max-depth N] [--allowedTools TOOLS]
 ```
 
 ### Examples
 
 ```bash
-# Claude
-coding-agent-rlm claude "src/**/*.ts" --prompt "Find all TODO comments"
-
 # Codex
-coding-agent-rlm codex "**/*.py" --prompt "Review for security issues"
+coderlm codex "src/**/*.ts" --prompt "Find all TODO comments"
+coderlm codex "src/**" "lib/**" "test/**" --prompt "Find dead code"
+coderlm codex "**/*.ts" --prompt "Summarize the codebase" --max-depth 2
 
 # Gemini
-coding-agent-rlm "bunx --bun @google/gemini-cli" "src/**" --prompt "Architecture overview"
+coderlm "bunx --bun @google/gemini-cli" "**/*.py" --prompt "Review for security issues"
+coderlm "bunx --bun @google/gemini-cli" "src/**" --prompt "Architecture overview"
 
-# Multiple globs
-coding-agent-rlm claude "src/**" "lib/**" "test/**" --prompt "Find dead code"
-
-# Limit recursion depth
-coding-agent-rlm claude "**/*.ts" --prompt "Summarize the codebase" --max-depth 2
+# Claude (non-recursive only — Claude cannot spawn nested Claude sessions)
+coderlm claude "src/**" --prompt "Fix type errors" --allowedTools "Bash,Edit"
 ```
 
 ## How It Works
 
 1. **Expand globs** into a file listing using `fd` (or `find` as fallback)
 2. **Build a system prompt** containing the file list and RLM instructions (explore, decompose, aggregate)
-3. **Launch the agent** with agent-specific flags for non-interactive execution
+3. **Inject context guards** via `BASH_ENV` so every bash subshell the agent spawns has output truncation active
+4. **Launch the agent** with agent-specific flags for non-interactive execution
 
 The agent receives a file listing — not file contents. It uses shell tools (`rg`, `cat`, `head`, `jq`, etc.) to inspect files as needed. For large file sets (>20 files), it spawns recursive sub-agents on subsets.
 
+### Context Guards (bundled)
+
+`bashrlm.sh` is bundled and auto-activates for every agent run. It wraps high-output commands (`cat`, `grep`, `rg`, `jq`, `find`, `ls`, `curl`, etc.) with automatic truncation, preventing the agent from flooding its own context window with oversized output.
+
+Truncation uses head+tail mode — the agent sees the start and end of any large output, with the middle omitted:
+
+```
+[TRUNCATED — showing 2000 of 15000 chars, first and last 1000]
+```
+
+Guards are redirect-aware: piping to a file (`> /tmp/out.txt`) bypasses truncation, so multi-step processing works naturally. The agent's system prompt includes instructions for this pattern.
+
 ### Supported Agents
 
-| Agent         | Command                         | Mode                                                               |
+| Agent         | Command                         | Notes                                                              |
 | ------------- | ------------------------------- | ------------------------------------------------------------------ |
-| Claude Code   | `claude`                        | `--append-system-prompt` (system prompt separate from user prompt) |
-| OpenAI Codex  | `codex`                         | `exec --full-auto`                                                 |
-| Google Gemini | `bunx --bun @google/gemini-cli` | `-p --yolo`                                                        |
-| Any CLI       | `my-agent`                      | Combined prompt as single argument                                 |
+| OpenAI Codex  | `codex`                         | Recommended — supports recursive sub-agents                        |
+| Google Gemini | `bunx --bun @google/gemini-cli` | Supports recursive sub-agents                                      |
+| Claude Code   | `claude`                        | Non-recursive only — cannot spawn nested Claude sessions           |
+| Any CLI       | `my-agent`                      | Combined prompt passed as single argument                          |
 
 ## When to Use
 
