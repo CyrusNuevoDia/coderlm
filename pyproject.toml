@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "coding-agent-rlm"
+name = "coderlm"
 version = "0.1.0"
 description = "Process large codebases using the RLM (Recursive Language Model) pattern"
 readme = "README.md"
@@ -11,10 +11,10 @@ license = "MIT"
 requires-python = ">=3.9"
 
 [project.scripts]
-coding-agent-rlm = "src:main"
+coderlm = "src:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["coding_agent_rlm"]
+packages = ["src"]
 
 [dependency-groups]
 dev = [

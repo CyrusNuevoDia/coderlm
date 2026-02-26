@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { dirname, resolve } from "node:path";
 import Bun from "bun";
 
-const script = resolve(dirname(import.meta.path), "coding-agent-rlm");
+const script = resolve(dirname(import.meta.path), "coderlm");
 const cwd = resolve(dirname(import.meta.path), "..");
 
 const parseNullDelimited = (buf: Buffer) =>
@@ -48,7 +48,7 @@ describe("integration", () => {
           "--max-depth",
           "1",
         ],
-        { cwd, stdout: "pipe", stderr: "pipe" },
+        { cwd, stdout: "pipe", stderr: "pipe" }
       );
       const [exitCode, stdout] = await Promise.all([
         proc.exited,
@@ -57,7 +57,7 @@ describe("integration", () => {
       expect(exitCode).toBe(0);
       expect(stdout.toLowerCase()).toContain("pyproject.toml");
     },
-    TIMEOUT,
+    TIMEOUT
   );
 
   test(
@@ -74,7 +74,7 @@ describe("integration", () => {
           "--max-depth",
           "1",
         ],
-        { cwd, stdout: "pipe", stderr: "pipe" },
+        { cwd, stdout: "pipe", stderr: "pipe" }
       );
       const [exitCode, stdout] = await Promise.all([
         proc.exited,
@@ -83,25 +83,22 @@ describe("integration", () => {
       expect(exitCode).toBe(0);
       expect(stdout.toLowerCase()).toContain("pyproject.toml");
     },
-    TIMEOUT,
+    TIMEOUT
   );
 
-  test(
-    "claude dry-runs with model flag",
-    async () => {
-      const { args, exitCode } = await dryRun([
-        "claude --model claude-haiku-4-5",
-        "*.toml",
-        "--prompt",
-        "test",
-      ]);
-      expect(exitCode).toBe(0);
-      expect(args[0]).toBe("claude");
-      expect(args[1]).toBe("--model");
-      expect(args[2]).toBe("claude-haiku-4-5");
-      expect(args[3]).toBe("-p");
-      expect(args[4]).toBe("--append-system-prompt");
-      expect(args[5]).toContain("pyproject.toml");
-    },
-  );
+  test("claude dry-runs with model flag", async () => {
+    const { args, exitCode } = await dryRun([
+      "claude --model claude-haiku-4-5",
+      "*.toml",
+      "--prompt",
+      "test",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(args[0]).toBe("claude");
+    expect(args[1]).toBe("--model");
+    expect(args[2]).toBe("claude-haiku-4-5");
+    expect(args[3]).toBe("-p");
+    expect(args[4]).toBe("--append-system-prompt");
+    expect(args[5]).toContain("pyproject.toml");
+  });
 });

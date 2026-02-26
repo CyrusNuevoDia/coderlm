@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A CLI that implements the RLM (Recursive Language Model) pattern: instead of feeding all files into an LLM's context, give it a file listing and let it use tools to peek, decompose, and recursively call itself on subsets. Ships as both an npm package (`bunx coding-agent-rlm`) and a PyPI package (`uvx coding-agent-rlm`).
+A CLI that implements the RLM (Recursive Language Model) pattern: instead of feeding all files into an LLM's context, give it a file listing and let it use tools to peek, decompose, and recursively call itself on subsets. Ships as both an npm package (`bunx coderlm`) and a PyPI package (`uvx coderlm`).
 
 ## Commands
 
@@ -18,7 +18,7 @@ just publish pypi major           # bump major + publish to pypi only
 
 ## Architecture
 
-The entire CLI is a single bash script at `src/coding-agent-rlm`. It:
+The entire CLI is a single bash script at `src/coderlm`. It:
 1. Parses args (command, globs, --prompt, --max-depth, --dry-run)
 2. Expands globs via `fd` (falls back to `find`)
 3. Builds a system prompt with the file list and RLM instructions

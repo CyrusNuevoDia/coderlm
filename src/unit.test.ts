@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { dirname, resolve } from "node:path";
 import Bun from "bun";
 
-const script = resolve(dirname(import.meta.path), "coding-agent-rlm");
+const script = resolve(dirname(import.meta.path), "coderlm");
 const cwd = resolve(dirname(import.meta.path), "..");
 
 const parseNullDelimited = (buf: Buffer) =>
@@ -49,13 +49,13 @@ describe("usage", () => {
   test("--help shows usage", async () => {
     const { stdout, exitCode } = await run(["--help"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Usage: coding-agent-rlm");
+    expect(stdout).toContain("Usage: coderlm");
   });
 
   test("no args shows usage", async () => {
     const { stdout, exitCode } = await run([]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Usage: coding-agent-rlm");
+    expect(stdout).toContain("Usage: coderlm");
   });
 
   test("missing --prompt errors", async () => {
@@ -112,6 +112,13 @@ describe("claude", () => {
     expect(sysPrompt).toContain("package.json");
   });
 
+  test("system prompt contains execution_environment block", async () => {
+    const { args } = await dryRun(["claude", "*.json", "--prompt", "test"]);
+    const sysPrompt = args[3];
+    expect(sysPrompt).toContain("<execution_environment>");
+    expect(sysPrompt).toContain("output guards");
+  });
+
   test("system prompt contains max-depth", async () => {
     const { args } = await dryRun([
       "claude",
@@ -123,6 +130,19 @@ describe("claude", () => {
     ]);
     const sysPrompt = args[3];
     expect(sysPrompt).toContain("max-depth=5");
+  });
+
+  test("--allowedTools overrides default Bash", async () => {
+    const { args } = await dryRun([
+      "claude",
+      "*.json",
+      "--prompt",
+      "test",
+      "--allowedTools",
+      "Bash,Edit",
+    ]);
+    expect(args[4]).toBe("--allowedTools");
+    expect(args[5]).toBe("Bash,Edit");
   });
 
   test("user prompt is NOT embedded in system prompt", async () => {
@@ -274,4 +294,3 @@ describe("file listing", () => {
     expect(stderr).toContain("no files matched");
   });
 });
-

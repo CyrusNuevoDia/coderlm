@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: coding-agent-rlm <command> <globs...> --prompt <prompt> [--max-depth N]
+Usage: coderlm <command> <globs...> --prompt <prompt> [--max-depth N]
 
 Process large codebases using the RLM (Recursive Language Model) pattern.
 Instead of feeding all files into context, the agent gets a file listing and
@@ -16,9 +16,9 @@ Arguments:
   --max-depth N   Recursion limit (default: 3)
 
 Examples:
-  coding-agent-rlm claude "src/**/*.ts" --prompt "Find all TODO comments"
-  coding-agent-rlm claude "src/**" "lib/**" --prompt "Architecture overview"
-  coding-agent-rlm codex "**/*.py" --prompt "Review for security issues"
+  coderlm claude "src/**/*.ts" --prompt "Find all TODO comments"
+  coderlm claude "src/**" "lib/**" --prompt "Architecture overview"
+  coderlm codex "**/*.py" --prompt "Review for security issues"
 EOF
   exit "${1:-0}"
 }
@@ -28,12 +28,14 @@ EOF
 [[ $# -eq 0 ]] && usage 0
 [[ "$1" == "--help" || "$1" == "-h" ]] && usage 0
 
-command="$1"; shift
+agent="$1"; shift
+read -ra _agent_cmd <<< "$agent"
 
 globs=()
 prompt=""
 max_depth=3
 dry_run=false
+allowed_tools="Bash"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,6 +47,9 @@ while [[ $# -gt 0 ]]; do
       max_depth="$2"; shift 2 ;;
     --dry-run)
       dry_run=true; shift ;;
+    --allowedTools)
+      [[ $# -lt 2 ]] && { echo "Error: --allowedTools requires a value" >&2; exit 1; }
+      allowed_tools="$2"; shift 2 ;;
     --help|-h)
       usage 0 ;;
     -*)
@@ -56,6 +61,15 @@ done
 
 [[ -z "$prompt" ]] && { echo "Error: --prompt is required" >&2; usage 1; }
 [[ ${#globs[@]} -eq 0 ]] && { echo "Error: at least one glob pattern is required" >&2; usage 1; }
+
+# --- Locate bundled bashrlm.sh, resolving symlinks (npm global install uses symlinks) ---
+
+_s="${BASH_SOURCE[0]}"
+[[ -L "$_s" ]] && { _t="$(readlink "$_s")"; [[ "$_t" != /* ]] && _t="$(dirname "$_s")/$_t"; _s="$_t"; }
+_bashrlm_script="$(cd "$(dirname "$_s")" && pwd)/bashrlm.sh"
+_bashrlm_prompt=""
+[[ -f "${_bashrlm_script%.*}.md" ]] && _bashrlm_prompt="$(cat "${_bashrlm_script%.*}.md")"
+unset _s _t
 
 # --- File Listing ---
 
@@ -76,7 +90,11 @@ fi
 
 # --- System Prompt ---
 
-file_count=$(echo "$file_list" | wc -l | tr -d ' ')
+if [[ -n "$file_list" ]]; then
+  file_count=$(echo "$file_list" | wc -l | tr -d ' ')
+else
+  file_count=0
+fi
 
 read -r -d '' system_prompt <<SYSPROMPT || true
 You are an RLM (Recursive Language Model). You answer queries about a codebase by interactively exploring files through tool use. Files exist in your environment, NOT in your context window. You must use tools to inspect them.
@@ -109,7 +127,7 @@ Before doing any analysis, understand what you're working with:
 
 ### 2. DECOMPOSE FOR LARGE FILE SETS
 For large file sets (>20 files), break the work into sub-tasks using recursive sub-agent calls:
-  coding-agent-rlm ${command} "<sub-glob>" --prompt "<sub-task>" --max-depth $((max_depth - 1))
+  coderlm ${agent} "<sub-glob>" --prompt "<sub-task>" --max-depth $((max_depth - 1))
 
 Decomposition strategies:
 - By directory: process each top-level directory separately
@@ -135,9 +153,23 @@ Each sub-agent gets its own context window and can handle substantial file sets.
 - Don't read all files at once — peek strategically, then go deeper where needed
 - Prefer rg/sg over reading entire files when searching for specific patterns
 - Minimize redundant work — if a sub-agent already analyzed something, use its results
+
+${_bashrlm_prompt}
 SYSPROMPT
 
 # --- Execute Agent ---
+
+# Activate context guards in every non-interactive bash subshell the agent spawns
+if [[ -f "$_bashrlm_script" ]]; then
+  if [[ -n "${BASH_ENV:-}" && "$BASH_ENV" != "$_bashrlm_script" ]]; then
+    _bashrlm_env_tmp=$(mktemp /tmp/.bashrlm_env.XXXXXX.sh)
+    printf '. "%s"\n. "%s"\n' "$BASH_ENV" "$_bashrlm_script" > "$_bashrlm_env_tmp"
+    export BASH_ENV="$_bashrlm_env_tmp"
+    trap 'rm -f "$_bashrlm_env_tmp"' EXIT
+  else
+    export BASH_ENV="$_bashrlm_script"
+  fi
+fi
 
 run() {
   if [[ "$dry_run" == true ]]; then
@@ -154,15 +186,15 @@ ${system_prompt}
 ${prompt}
 </task>"
 
-if [[ "$command" == *claude* ]]; then
-  run $command -p \
+if [[ "$agent" == *claude* ]]; then
+  run "${_agent_cmd[@]}" -p \
     --append-system-prompt "$system_prompt" \
-    --allowedTools "Bash" \
+    --allowedTools "$allowed_tools" \
     "$prompt"
-elif [[ "$command" == *codex* ]]; then
-  run $command exec --full-auto "$combined_prompt"
-elif [[ "$command" == *gemini* ]]; then
-  run $command -p "$combined_prompt" --yolo
+elif [[ "$agent" == *codex* ]]; then
+  run "${_agent_cmd[@]}" exec --full-auto "$combined_prompt"
+elif [[ "$agent" == *gemini* ]]; then
+  run "${_agent_cmd[@]}" -p "$combined_prompt" --yolo
 else
-  run $command "$combined_prompt"
+  run "${_agent_cmd[@]}" "$combined_prompt"
 fi
