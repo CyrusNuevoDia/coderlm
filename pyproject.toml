@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "coderlm"
-version = "0.2.0"
-description = "Process large codebases using the RLM (Recursive Language Model) pattern"
+version = "0.2.1"
+description = "Make codex, gemini-cli, or any other coding agent into an RLM."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"

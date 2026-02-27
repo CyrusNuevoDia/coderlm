@@ -10,7 +10,7 @@ test:
 
 # Format code (py, ts, or all)
 fmt target="all":
-    just _fmt-{{target}}
+    just _fmt-{{ target }}
 
 _fmt-all:
     just _fmt-ts
@@ -25,7 +25,7 @@ _fmt-py:
 
 # Lint code (py, ts, or all)
 lint target="all":
-    just _lint-{{target}}
+    just _lint-{{ target }}
 
 _lint-all:
     just _lint-ts
@@ -42,7 +42,7 @@ _lint-py:
 publish target:
     #!/usr/bin/env bash
     set -euo pipefail
-    case "{{target}}" in
+    case "{{ target }}" in
         npm)  npm publish ;;
         pypi) uv build && uv publish ;;
     esac
@@ -51,7 +51,6 @@ publish target:
 bump level="patch":
     #!/usr/bin/env bash
     set -euo pipefail
-    npm version {{level}} --no-git-tag-version
+    npm version {{ level }} --no-git-tag-version
     version=$(jq -r .version package.json)
     perl -pi -e "s/^version = .*/version = \"$version\"/" pyproject.toml
-    echo "Bumped to $version"
