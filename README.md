@@ -1,3 +1,5 @@
+[![npm](https://img.shields.io/npm/v/coderlm)](https://www.npmjs.com/package/coderlm) [![PyPI](https://img.shields.io/pypi/v/coderlm)](https://pypi.org/project/coderlm/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # coderlm
 
 Make codex, gemini-cli, or any other coding agent into an RLM.
