@@ -1,8 +1,6 @@
 # coderlm
 
-Process large codebases with Coding Agents using the **RLM (Recursive Language Model)** pattern — with bundled context guards to keep the agent's output from flooding its own context window.
-
-Instead of stuffing all files into an LLM's context window, give it a file listing and let it use tools to peek, decompose, and recursively call itself on subsets. This keeps each agent focused on a manageable scope while covering arbitrarily large codebases.
+Make codex, gemini-cli, or any other coding agent into an RLM.
 
 ## Install
 
