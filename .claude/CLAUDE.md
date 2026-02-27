@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A CLI that implements the RLM (Recursive Language Model) pattern: instead of feeding all files into an LLM's context, give it a file listing and let it use tools to peek, decompose, and recursively call itself on subsets. Ships as both an npm package (`bunx coderlm`) and a PyPI package (`uvx coderlm`).
+A CLI that implements the RLM (Recursive Language Model) pattern: instead of feeding all files into an LLM's context, let it discover files via shell tools, peek strategically, and recursively decompose into sub-agents. Ships as both an npm package (`bunx coderlm`) and a PyPI package (`uvx coderlm`).
 
 ## Commands
 
@@ -22,10 +22,9 @@ bun x ultracite check             # check for issues
 ## Architecture
 
 The entire CLI is a single bash script at `src/coderlm`. It:
-1. Parses args (command, globs, --prompt, --max-depth, --dry-run)
-2. Expands globs via `fd` (falls back to `find`)
-3. Builds a system prompt with the file list and RLM instructions
-4. Dispatches to the appropriate agent with agent-specific flags:
+1. Parses args (command, --prompt, --max-depth, --dry-run)
+2. Builds a system prompt with RLM instructions (discover, explore, decompose, aggregate)
+3. Dispatches to the appropriate agent with agent-specific flags:
    - **claude**: `-p --append-system-prompt <sys> --allowedTools Bash <prompt>` (system prompt separate)
    - **codex**: `exec --full-auto <combined>` (system + task combined)
    - **gemini**: `-p <combined> --yolo` (command is word-split, e.g. `bunx --bun @google/gemini-cli`)
@@ -37,8 +36,8 @@ The Python package (`src/__init__.py`) is a thin wrapper that `os.execvp`s the b
 
 **Model passthrough**: The agent command is word-split (`read -ra _agent_cmd <<< "$agent"`), so model flags can be passed inline:
 ```bash
-coderlm "claude --model claude-haiku-4-5" "**/*.ts" --prompt "..."
-coderlm "codex -m o4-mini" "**/*.py" --prompt "..."
+coderlm "claude --model claude-haiku-4-5" --prompt "..."
+coderlm "codex -m o4-mini" --prompt "..."
 ```
 
 ## Testing

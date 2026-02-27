@@ -59,21 +59,25 @@ describe("usage", () => {
   });
 
   test("missing --prompt errors", async () => {
-    const { stderr, exitCode } = await run(["claude", "*.ts"]);
+    const { stderr, exitCode } = await run(["claude"]);
     expect(exitCode).not.toBe(0);
     expect(stderr).toContain("--prompt is required");
   });
 
-  test("missing globs errors", async () => {
-    const { stderr, exitCode } = await run(["claude", "--prompt", "test"]);
+  test("unexpected positional argument errors", async () => {
+    const { stderr, exitCode } = await run([
+      "claude",
+      "*.ts",
+      "--prompt",
+      "test",
+    ]);
     expect(exitCode).not.toBe(0);
-    expect(stderr).toContain("at least one glob pattern is required");
+    expect(stderr).toContain("unexpected argument");
   });
 
   test("unknown option errors", async () => {
     const { stderr, exitCode } = await run([
       "claude",
-      "*.ts",
       "--bogus",
       "--prompt",
       "test",
@@ -89,7 +93,6 @@ describe("claude", () => {
   test("passes -p, --append-system-prompt, --allowedTools", async () => {
     const { args, exitCode } = await dryRun([
       "claude",
-      "*.toml",
       "--prompt",
       "find bugs",
     ]);
@@ -99,21 +102,14 @@ describe("claude", () => {
     expect(args[2]).toBe("--append-system-prompt");
     // args[3] is the system prompt
     expect(args[3]).toContain("You are an RLM");
-    expect(args[3]).toContain("pyproject.toml");
     expect(args[4]).toBe("--allowedTools");
     expect(args[5]).toBe("Bash");
     // args[6] is the user prompt (separate from system prompt)
     expect(args[6]).toBe("find bugs");
   });
 
-  test("system prompt contains file list", async () => {
-    const { args } = await dryRun(["claude", "*.json", "--prompt", "test"]);
-    const sysPrompt = args[3];
-    expect(sysPrompt).toContain("package.json");
-  });
-
   test("system prompt contains execution_environment block", async () => {
-    const { args } = await dryRun(["claude", "*.json", "--prompt", "test"]);
+    const { args } = await dryRun(["claude", "--prompt", "test"]);
     const sysPrompt = args[3];
     expect(sysPrompt).toContain("<execution_environment>");
     expect(sysPrompt).toContain("output guards");
@@ -122,7 +118,6 @@ describe("claude", () => {
   test("system prompt contains max-depth", async () => {
     const { args } = await dryRun([
       "claude",
-      "*.json",
       "--prompt",
       "test",
       "--max-depth",
@@ -135,7 +130,6 @@ describe("claude", () => {
   test("--allowedTools overrides default Bash", async () => {
     const { args } = await dryRun([
       "claude",
-      "*.json",
       "--prompt",
       "test",
       "--allowedTools",
@@ -146,12 +140,7 @@ describe("claude", () => {
   });
 
   test("user prompt is NOT embedded in system prompt", async () => {
-    const { args } = await dryRun([
-      "claude",
-      "*.json",
-      "--prompt",
-      "find all secrets",
-    ]);
+    const { args } = await dryRun(["claude", "--prompt", "find all secrets"]);
     const sysPrompt = args[3];
     expect(sysPrompt).not.toContain("find all secrets");
   });
@@ -163,7 +152,6 @@ describe("codex", () => {
   test("passes exec --full-auto with combined prompt", async () => {
     const { args, exitCode } = await dryRun([
       "codex",
-      "*.toml",
       "--prompt",
       "review code",
     ]);
@@ -175,11 +163,6 @@ describe("codex", () => {
     expect(args[3]).toContain("You are an RLM");
     expect(args[3]).toContain("review code");
   });
-
-  test("combined prompt includes file list", async () => {
-    const { args } = await dryRun(["codex", "*.json", "--prompt", "test"]);
-    expect(args[3]).toContain("package.json");
-  });
 });
 
 // --- Gemini ---
@@ -188,7 +171,6 @@ describe("gemini", () => {
   test("passes -p and --yolo with combined prompt", async () => {
     const { args, exitCode } = await dryRun([
       "bunx --bun @google/gemini-cli",
-      "*.toml",
       "--prompt",
       "analyze deps",
     ]);
@@ -211,7 +193,6 @@ describe("generic command", () => {
   test("passes combined prompt as single arg", async () => {
     const { args, exitCode } = await dryRun([
       "my-agent",
-      "*.toml",
       "--prompt",
       "do stuff",
     ]);
@@ -228,7 +209,6 @@ describe("model passthrough", () => {
   test("claude with --model is word-split correctly", async () => {
     const { args } = await dryRun([
       "claude --model claude-haiku-4-5",
-      "*.toml",
       "--prompt",
       "test",
     ]);
@@ -241,7 +221,6 @@ describe("model passthrough", () => {
   test("codex with -m is word-split correctly", async () => {
     const { args } = await dryRun([
       "codex -m gpt-5.2-mini",
-      "*.toml",
       "--prompt",
       "test",
     ]);
@@ -254,7 +233,6 @@ describe("model passthrough", () => {
   test("gemini with -m is word-split correctly", async () => {
     const { args } = await dryRun([
       "bunx --bun @google/gemini-cli -m gemini-2.5-flash",
-      "*.toml",
       "--prompt",
       "test",
     ]);
@@ -264,33 +242,5 @@ describe("model passthrough", () => {
     expect(args[3]).toBe("-m");
     expect(args[4]).toBe("gemini-2.5-flash");
     expect(args[5]).toBe("-p");
-  });
-});
-
-// --- File listing ---
-
-describe("file listing", () => {
-  test("multiple globs are combined", async () => {
-    const { args } = await dryRun([
-      "claude",
-      "*.toml",
-      "*.json",
-      "--prompt",
-      "test",
-    ]);
-    const sysPrompt = args[3];
-    expect(sysPrompt).toContain("pyproject.toml");
-    expect(sysPrompt).toContain("package.json");
-  });
-
-  test("no matching files warns on stderr", async () => {
-    const { stderr, exitCode } = await dryRun([
-      "claude",
-      "*.nonexistent",
-      "--prompt",
-      "test",
-    ]);
-    expect(exitCode).toBe(0);
-    expect(stderr).toContain("no files matched");
   });
 });

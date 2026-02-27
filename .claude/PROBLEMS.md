@@ -10,7 +10,7 @@ Running log of known issues and workarounds.
 
 **Workaround**: Test the claude path from a standalone terminal:
 ```bash
-./src/coderlm claude "**/*.ts" --prompt "Summarize" --max-depth 1
+./src/coderlm claude --prompt "Summarize all .ts files" --max-depth 1
 ```
 
 The integration test suite uses `--dry-run` for claude to verify command construction without actually spawning a session.

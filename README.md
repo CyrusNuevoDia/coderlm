@@ -24,33 +24,32 @@ uv tool install coderlm  # pypi
 ## Usage
 
 ```
-coderlm <agent> <globs...> --prompt "<task>" [--max-depth N] [--allowedTools TOOLS]
+coderlm <agent> --prompt "<task>" [--max-depth N] [--allowedTools TOOLS]
 ```
 
 ### Examples
 
 ```bash
 # Codex
-coderlm codex "src/**/*.ts" --prompt "Find all TODO comments"
-coderlm codex "src/**" "lib/**" "test/**" --prompt "Find dead code"
-coderlm codex "**/*.ts" --prompt "Summarize the codebase" --max-depth 2
+coderlm codex --prompt "Find all TODO comments in src/"
+coderlm codex --prompt "Find dead code in src/, lib/, and test/"
+coderlm codex --prompt "Summarize the codebase" --max-depth 2
 
 # Gemini
-coderlm "bunx --bun @google/gemini-cli" "**/*.py" --prompt "Review for security issues"
-coderlm "bunx --bun @google/gemini-cli" "src/**" --prompt "Architecture overview"
+coderlm "bunx --bun @google/gemini-cli" --prompt "Review **/*.py for security issues"
+coderlm "bunx --bun @google/gemini-cli" --prompt "Architecture overview of src/"
 
 # Claude (non-recursive only — Claude cannot spawn nested Claude sessions)
-coderlm claude "src/**" --prompt "Fix type errors" --allowedTools "Bash,Edit"
+coderlm claude --prompt "Fix type errors in src/" --allowedTools "Bash,Edit"
 ```
 
 ## How It Works
 
-1. **Expand globs** into a file listing using `fd` (or `find` as fallback)
-2. **Build a system prompt** containing the file list and RLM instructions (explore, decompose, aggregate)
-3. **Inject context guards** via `BASH_ENV` so every bash subshell the agent spawns has output truncation active
-4. **Launch the agent** with agent-specific flags for non-interactive execution
+1. **Build a system prompt** with RLM instructions (discover, explore, decompose, aggregate)
+2. **Inject context guards** via `BASH_ENV` so every bash subshell the agent spawns has output truncation active
+3. **Launch the agent** with agent-specific flags for non-interactive execution
 
-The agent receives a file listing — not file contents. It uses shell tools (`rg`, `cat`, `head`, `jq`, etc.) to inspect files as needed. For large file sets (>20 files), it spawns recursive sub-agents on subsets.
+The agent starts with no file contents in context. It uses shell tools (`fd`, `rg`, `cat`, `head`, `jq`, etc.) to discover and inspect files as needed. For large file sets (>20 files), it spawns recursive sub-agents on subsets.
 
 ### Context Guards (bundled)
 

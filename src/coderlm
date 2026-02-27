@@ -3,22 +3,21 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: coderlm <command> <globs...> --prompt <prompt> [--max-depth N]
+Usage: coderlm <command> --prompt <prompt> [--max-depth N]
 
 Process large codebases using the RLM (Recursive Language Model) pattern.
-Instead of feeding all files into context, the agent gets a file listing and
-uses tools to peek, decompose, and recursively process subsets.
+The agent discovers relevant files itself using shell tools, then peeks,
+decomposes, and recursively calls itself on subsets.
 
 Arguments:
   <command>       Agent to use (claude, codex, or any command)
-  <globs...>      One or more file glob patterns
   --prompt TEXT   The task for the agent (required)
   --max-depth N   Recursion limit (default: 3)
 
 Examples:
-  coderlm claude "src/**/*.ts" --prompt "Find all TODO comments"
-  coderlm claude "src/**" "lib/**" --prompt "Architecture overview"
-  coderlm codex "**/*.py" --prompt "Review for security issues"
+  coderlm claude --prompt "Find all TODO comments in src/"
+  coderlm claude --prompt "Architecture overview of src/ and lib/"
+  coderlm codex --prompt "Review **/*.py for security issues"
 EOF
   exit "${1:-0}"
 }
@@ -31,7 +30,6 @@ EOF
 agent="$1"; shift
 read -ra _agent_cmd <<< "$agent"
 
-globs=()
 prompt=""
 max_depth=3
 dry_run=false
@@ -55,12 +53,11 @@ while [[ $# -gt 0 ]]; do
     -*)
       echo "Error: unknown option $1" >&2; exit 1 ;;
     *)
-      globs+=("$1"); shift ;;
+      echo "Error: unexpected argument $1" >&2; exit 1 ;;
   esac
 done
 
 [[ -z "$prompt" ]] && { echo "Error: --prompt is required" >&2; usage 1; }
-[[ ${#globs[@]} -eq 0 ]] && { echo "Error: at least one glob pattern is required" >&2; usage 1; }
 
 # --- Locate bundled bashrlm.sh, resolving symlinks (npm global install uses symlinks) ---
 
@@ -71,55 +68,31 @@ _bashrlm_prompt=""
 [[ -f "${_bashrlm_script%.*}.md" ]] && _bashrlm_prompt="$(cat "${_bashrlm_script%.*}.md")"
 unset _s _t
 
-# --- File Listing ---
-
-file_list=""
-for glob in "${globs[@]}"; do
-  if command -v fd &>/dev/null; then
-    file_list+="$(fd --glob "$glob" 2>/dev/null || true)"$'\n'
-  else
-    file_list+="$(find . -path "./$glob" -type f 2>/dev/null | sed 's|^\./||' || true)"$'\n'
-  fi
-done
-
-file_list="$(echo "$file_list" | sort -u | sed '/^$/d')"
-
-if [[ -z "$file_list" ]]; then
-  echo "Warning: no files matched the given patterns" >&2
-fi
-
 # --- System Prompt ---
 
-if [[ -n "$file_list" ]]; then
-  file_count=$(echo "$file_list" | wc -l | tr -d ' ')
-else
-  file_count=0
-fi
-
 read -r -d '' system_prompt <<SYSPROMPT || true
-You are an RLM (Recursive Language Model). You answer queries about a codebase by interactively exploring files through tool use. Files exist in your environment, NOT in your context window. You must use tools to inspect them.
+You are an RLM (Recursive Language Model). You answer queries about a codebase by discovering and exploring files through tool use. The codebase exists in your working directory — you must use tools to discover which files exist and inspect their contents.
 
-You will work iteratively: explore, analyze, decompose, and aggregate. Do NOT try to solve everything in one step.
-
-## Files (${file_count} total)
-${file_list}
+You will work iteratively: discover, explore, analyze, decompose, and aggregate. Do NOT try to solve everything in one step.
 
 ## Tools
 Prefer these when available:
+- fd — find files by name/pattern (faster alternative to find)
 - rg (ripgrep) — search file contents by pattern
 - ast-grep (sg) — structural code search (AST-aware)
+- eza — list files with metadata (sizes, permissions, tree view)
 - jq — query/transform JSON files
 - qsv — query/transform CSV files
 - head -n N / tail -n N / sed -n 'start,endp' — read file slices
-- fd — find files by name/pattern (faster alternative to find)
-- eza — list files with metadata (sizes, permissions, tree view)
 - wc -l — line counts
 - cat — read entire small files
 
 ## Strategy
 
-### 1. EXPLORE FIRST
-Before doing any analysis, understand what you're working with:
+### 1. DISCOVER AND EXPLORE
+Before doing any analysis, discover what you're working with:
+- Use fd or find to locate files relevant to your task
+- Use eza --tree or fd to understand directory structure
 - Check file count and sizes (wc -l) to gauge scope
 - Sample a few files with head to understand structure and conventions
 - Use rg to scan for patterns relevant to your task
@@ -127,13 +100,12 @@ Before doing any analysis, understand what you're working with:
 
 ### 2. DECOMPOSE FOR LARGE FILE SETS
 For large file sets (>20 files), break the work into sub-tasks using recursive sub-agent calls:
-  coderlm ${agent} "<sub-glob>" --prompt "<sub-task>" --max-depth $((max_depth - 1))
+  coderlm ${agent} --prompt "<sub-task>" --max-depth $((max_depth - 1))
 
 Decomposition strategies:
-- By directory: process each top-level directory separately
-- By file type: group .ts, .py, .css, etc. into separate passes
+- By directory: tell sub-agents to focus on specific directories
 - By concern: split "find bugs" into "find null-safety issues", "find error handling issues", etc.
-- By size: chunk large file sets into batches of 10-20 files per sub-agent
+- By scope: for very large codebases, partition into manageable regions per sub-agent
 
 Each sub-agent gets its own context window and can handle substantial file sets. Don't over-split — analyze the file count and sizes first, then determine if you can cover the scope in a few sub-agent calls rather than many small ones.
 

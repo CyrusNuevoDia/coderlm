@@ -29,8 +29,7 @@ async function dryRun(args: string[]) {
   };
 }
 
-const PROMPT =
-  "List the filenames you were given. Reply in one sentence, no tool use.";
+const PROMPT = "List the .toml files in this directory. Reply in one sentence.";
 const TIMEOUT = 120_000;
 
 describe("integration", () => {
@@ -42,7 +41,6 @@ describe("integration", () => {
           "bash",
           script,
           "codex -m o4-mini",
-          "*.toml",
           "--prompt",
           PROMPT,
           "--max-depth",
@@ -68,7 +66,6 @@ describe("integration", () => {
           "bash",
           script,
           "bunx --bun @google/gemini-cli -m gemini-2.5-flash",
-          "*.toml",
           "--prompt",
           PROMPT,
           "--max-depth",
@@ -89,7 +86,6 @@ describe("integration", () => {
   test("claude dry-runs with model flag", async () => {
     const { args, exitCode } = await dryRun([
       "claude --model claude-haiku-4-5",
-      "*.toml",
       "--prompt",
       "test",
     ]);
@@ -99,6 +95,6 @@ describe("integration", () => {
     expect(args[2]).toBe("claude-haiku-4-5");
     expect(args[3]).toBe("-p");
     expect(args[4]).toBe("--append-system-prompt");
-    expect(args[5]).toContain("pyproject.toml");
+    expect(args[5]).toContain("You are an RLM");
   });
 });

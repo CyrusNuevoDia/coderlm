@@ -39,13 +39,12 @@ _lint-py:
     ruff check
 
 # Publish current version to npm, pypi, or both (default: all)
-publish target="all":
+publish target:
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{target}}" in
         npm)  npm publish ;;
         pypi) uv build && uv publish ;;
-        all)  npm publish && uv build && uv publish ;;
     esac
 
 # Bump version in package.json and pyproject.toml (default: patch)
