@@ -1,6 +1,6 @@
 {
   "name": "coderlm",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Process large codebases using the RLM (Recursive Language Model) pattern",
   "bin": {
     "coderlm": "src/coderlm"
