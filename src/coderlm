@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: coderlm <command> --prompt <prompt> [--max-depth N]
+Usage: coderlm <command> --prompt <file> [--max-depth N]
 
 Process large codebases using the RLM (Recursive Language Model) pattern.
 The agent discovers relevant files itself using shell tools, then peeks,
@@ -11,13 +11,13 @@ decomposes, and recursively calls itself on subsets.
 
 Arguments:
   <command>       Agent to use (claude, codex, or any command)
-  --prompt TEXT   The task for the agent (required)
+  --prompt FILE   Path to a file containing the task (required)
   --max-depth N   Recursion limit (default: 3)
 
 Examples:
-  coderlm claude --prompt "Find all TODO comments in src/"
-  coderlm claude --prompt "Architecture overview of src/ and lib/"
-  coderlm codex --prompt "Review **/*.py for security issues"
+  echo "Find all TODO comments in src/" > task.txt
+  coderlm claude --prompt task.txt
+  coderlm codex --prompt task.txt
 EOF
   exit "${1:-0}"
 }
@@ -58,6 +58,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -z "$prompt" ]] && { echo "Error: --prompt is required" >&2; usage 1; }
+[[ -f "$prompt" ]] || { echo "Error: prompt file not found: $prompt" >&2; exit 1; }
 
 # --- Locate bundled bashrlm.sh, resolving symlinks (npm global install uses symlinks) ---
 
@@ -100,7 +101,9 @@ Before doing any analysis, discover what you're working with:
 
 ### 2. DECOMPOSE FOR LARGE FILE SETS
 For large file sets (>20 files), break the work into sub-tasks using recursive sub-agent calls:
-  coderlm ${agent} --prompt "<sub-task>" --max-depth $((max_depth - 1))
+  _f=\$(mktemp /tmp/coderlm_task.XXXXXX.txt)
+  printf '%s' '<sub-task>' > "\$_f"
+  coderlm ${agent} --prompt "\$_f" --max-depth $((max_depth - 1))
 
 Decomposition strategies:
 - By directory: tell sub-agents to focus on specific directories
@@ -151,18 +154,21 @@ run() {
   exec "$@"
 }
 
+_task_ref="Your task is stored in this file: $prompt
+Read it first: cat \"$prompt\""
+
 combined_prompt="<instructions>
 ${system_prompt}
 </instructions>
 <task>
-${prompt}
+${_task_ref}
 </task>"
 
 if [[ "$agent" == *claude* ]]; then
   run "${_agent_cmd[@]}" -p \
     --append-system-prompt "$system_prompt" \
     --allowedTools "$allowed_tools" \
-    "$prompt"
+    "$_task_ref"
 elif [[ "$agent" == *codex* ]]; then
   run "${_agent_cmd[@]}" exec --full-auto "$combined_prompt"
 elif [[ "$agent" == *gemini* ]]; then

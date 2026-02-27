@@ -1,6 +1,6 @@
 {
   "name": "coderlm",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "Make codex, gemini-cli, or any other coding agent into an RLM.",
   "bin": {
     "coderlm": "src/coderlm"

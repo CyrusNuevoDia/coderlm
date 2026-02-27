@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { dirname, resolve } from "node:path";
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import Bun from "bun";
 
 const script = resolve(dirname(import.meta.path), "coderlm");
 const cwd = resolve(dirname(import.meta.path), "..");
+
+const promptFile = join(tmpdir(), "coderlm-test-prompt.txt");
+writeFileSync(promptFile, "test task content");
 
 const parseNullDelimited = (buf: Buffer) =>
   buf
@@ -69,7 +74,7 @@ describe("usage", () => {
       "claude",
       "*.ts",
       "--prompt",
-      "test",
+      promptFile,
     ]);
     expect(exitCode).not.toBe(0);
     expect(stderr).toContain("unexpected argument");
@@ -80,10 +85,20 @@ describe("usage", () => {
       "claude",
       "--bogus",
       "--prompt",
-      "test",
+      promptFile,
     ]);
     expect(exitCode).not.toBe(0);
     expect(stderr).toContain("unknown option --bogus");
+  });
+
+  test("errors when prompt file not found", async () => {
+    const { stderr, exitCode } = await run([
+      "claude",
+      "--prompt",
+      "/nonexistent/file.txt",
+    ]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("prompt file not found");
   });
 });
 
@@ -91,11 +106,7 @@ describe("usage", () => {
 
 describe("claude", () => {
   test("passes -p, --append-system-prompt, --allowedTools", async () => {
-    const { args, exitCode } = await dryRun([
-      "claude",
-      "--prompt",
-      "find bugs",
-    ]);
+    const { args, exitCode } = await dryRun(["claude", "--prompt", promptFile]);
     expect(exitCode).toBe(0);
     expect(args[0]).toBe("claude");
     expect(args[1]).toBe("-p");
@@ -104,12 +115,13 @@ describe("claude", () => {
     expect(args[3]).toContain("You are an RLM");
     expect(args[4]).toBe("--allowedTools");
     expect(args[5]).toBe("Bash");
-    // args[6] is the user prompt (separate from system prompt)
-    expect(args[6]).toBe("find bugs");
+    // args[6] is the task reference pointing to the prompt file
+    expect(args[6]).toContain("Your task is stored in this file:");
+    expect(args[6]).toContain(promptFile);
   });
 
   test("system prompt contains execution_environment block", async () => {
-    const { args } = await dryRun(["claude", "--prompt", "test"]);
+    const { args } = await dryRun(["claude", "--prompt", promptFile]);
     const sysPrompt = args[3];
     expect(sysPrompt).toContain("<execution_environment>");
     expect(sysPrompt).toContain("output guards");
@@ -119,7 +131,7 @@ describe("claude", () => {
     const { args } = await dryRun([
       "claude",
       "--prompt",
-      "test",
+      promptFile,
       "--max-depth",
       "5",
     ]);
@@ -131,7 +143,7 @@ describe("claude", () => {
     const { args } = await dryRun([
       "claude",
       "--prompt",
-      "test",
+      promptFile,
       "--allowedTools",
       "Bash,Edit",
     ]);
@@ -139,10 +151,10 @@ describe("claude", () => {
     expect(args[5]).toBe("Bash,Edit");
   });
 
-  test("user prompt is NOT embedded in system prompt", async () => {
-    const { args } = await dryRun(["claude", "--prompt", "find all secrets"]);
+  test("task file path is NOT embedded in system prompt", async () => {
+    const { args } = await dryRun(["claude", "--prompt", promptFile]);
     const sysPrompt = args[3];
-    expect(sysPrompt).not.toContain("find all secrets");
+    expect(sysPrompt).not.toContain(promptFile);
   });
 });
 
@@ -150,18 +162,15 @@ describe("claude", () => {
 
 describe("codex", () => {
   test("passes exec --full-auto with combined prompt", async () => {
-    const { args, exitCode } = await dryRun([
-      "codex",
-      "--prompt",
-      "review code",
-    ]);
+    const { args, exitCode } = await dryRun(["codex", "--prompt", promptFile]);
     expect(exitCode).toBe(0);
     expect(args[0]).toBe("codex");
     expect(args[1]).toBe("exec");
     expect(args[2]).toBe("--full-auto");
-    // args[3] is the combined prompt (system + task)
+    // args[3] is the combined prompt (system + task reference)
     expect(args[3]).toContain("You are an RLM");
-    expect(args[3]).toContain("review code");
+    expect(args[3]).toContain("Your task is stored in this file:");
+    expect(args[3]).toContain(promptFile);
   });
 });
 
@@ -172,7 +181,7 @@ describe("gemini", () => {
     const { args, exitCode } = await dryRun([
       "bunx --bun @google/gemini-cli",
       "--prompt",
-      "analyze deps",
+      promptFile,
     ]);
     expect(exitCode).toBe(0);
     // word-split: bunx, --bun, @google/gemini-cli, -p, <prompt>, --yolo
@@ -180,9 +189,10 @@ describe("gemini", () => {
     expect(args[1]).toBe("--bun");
     expect(args[2]).toBe("@google/gemini-cli");
     expect(args[3]).toBe("-p");
-    // args[4] is the combined prompt
+    // args[4] is the combined prompt (system + task reference)
     expect(args[4]).toContain("You are an RLM");
-    expect(args[4]).toContain("analyze deps");
+    expect(args[4]).toContain("Your task is stored in this file:");
+    expect(args[4]).toContain(promptFile);
     expect(args[5]).toBe("--yolo");
   });
 });
@@ -194,12 +204,13 @@ describe("generic command", () => {
     const { args, exitCode } = await dryRun([
       "my-agent",
       "--prompt",
-      "do stuff",
+      promptFile,
     ]);
     expect(exitCode).toBe(0);
     expect(args[0]).toBe("my-agent");
     expect(args[1]).toContain("You are an RLM");
-    expect(args[1]).toContain("do stuff");
+    expect(args[1]).toContain("Your task is stored in this file:");
+    expect(args[1]).toContain(promptFile);
   });
 });
 
@@ -210,7 +221,7 @@ describe("model passthrough", () => {
     const { args } = await dryRun([
       "claude --model claude-haiku-4-5",
       "--prompt",
-      "test",
+      promptFile,
     ]);
     expect(args[0]).toBe("claude");
     expect(args[1]).toBe("--model");
@@ -222,7 +233,7 @@ describe("model passthrough", () => {
     const { args } = await dryRun([
       "codex -m gpt-5.2-mini",
       "--prompt",
-      "test",
+      promptFile,
     ]);
     expect(args[0]).toBe("codex");
     expect(args[1]).toBe("-m");
@@ -234,7 +245,7 @@ describe("model passthrough", () => {
     const { args } = await dryRun([
       "bunx --bun @google/gemini-cli -m gemini-2.5-flash",
       "--prompt",
-      "test",
+      promptFile,
     ]);
     expect(args[0]).toBe("bunx");
     expect(args[1]).toBe("--bun");

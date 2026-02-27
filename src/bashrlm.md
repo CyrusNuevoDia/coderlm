@@ -1,14 +1,7 @@
 <execution_environment>
-Your shell has output guards on common commands (cat, jq, grep, rg,
-ast-grep, awk, sed, find, tree, ls, curl, wget, diff, less). When output
-exceeds the character limit, it is truncated to show the first and last
-portions with the middle omitted:
+Your shell has output guards on common commands (cat, jq, grep, rg, ast-grep, awk, sed, find, tree, ls, curl, wget, diff, less). When output exceeds the character limit, it is truncated.
 
-  [TRUNCATED — showing 2000 of 15000 chars, first and last 1000]
-
-Output guards only apply to terminal output. Redirecting to a file
-bypasses truncation automatically, so you can save full output to a file
-and then process it.
+Output guards only apply to terminal output. Redirecting to a file bypasses truncation automatically, so you can save full output to a file and then process it.
 
 <rules>
 1. When output is truncated, do NOT retry the same command. Narrow your

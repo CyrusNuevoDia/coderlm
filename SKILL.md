@@ -6,15 +6,16 @@ description: Use when a task involves many files (>10), the total content exceed
 ## Usage
 
 ```
-coderlm <agent> --prompt "<task>" [--max-depth N] [--allowedTools TOOLS]
+coderlm <agent> --prompt <file> [--max-depth N] [--allowedTools TOOLS]
 ```
 
 ## Examples
 
 ```bash
-coderlm codex --prompt "Find all TODO comments in src/"
-coderlm codex --prompt "Architecture overview of src/ and lib/"
-coderlm "bunx --bun @google/gemini-cli" --prompt "Review **/*.py for security issues"
-coderlm "bunx --bun @google/gemini-cli" --prompt "Find dead code in src/"
-coderlm claude --prompt "Fix type errors in src/" --allowedTools "Bash,Edit"
+echo "Find all TODO comments in src/" > task.txt
+coderlm codex --prompt task.txt
+coderlm "bunx --bun @google/gemini-cli" --prompt task.txt
+
+echo "Fix type errors in src/" > task.txt
+coderlm claude --prompt task.txt --allowedTools "Bash,Edit"
 ```

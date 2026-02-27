@@ -26,23 +26,27 @@ uv tool install coderlm  # pypi
 ## Usage
 
 ```
-coderlm <agent> --prompt "<task>" [--max-depth N] [--allowedTools TOOLS]
+coderlm <agent> --prompt <file> [--max-depth N] [--allowedTools TOOLS]
 ```
+
+`--prompt` takes a path to a file containing the task. The agent is told where the file is and reads it itself.
 
 ### Examples
 
 ```bash
+# Write your task to a file, then run
+echo "Find all TODO comments in src/" > task.txt
+
 # Codex
-coderlm codex --prompt "Find all TODO comments in src/"
-coderlm codex --prompt "Find dead code in src/, lib/, and test/"
-coderlm codex --prompt "Summarize the codebase" --max-depth 2
+coderlm codex --prompt task.txt
+coderlm codex --prompt task.txt --max-depth 2
 
 # Gemini
-coderlm "bunx --bun @google/gemini-cli" --prompt "Review **/*.py for security issues"
-coderlm "bunx --bun @google/gemini-cli" --prompt "Architecture overview of src/"
+coderlm "bunx --bun @google/gemini-cli" --prompt task.txt
 
 # Claude (non-recursive only — Claude cannot spawn nested Claude sessions)
-coderlm claude --prompt "Fix type errors in src/" --allowedTools "Bash,Edit"
+echo "Fix type errors in src/" > task.txt
+coderlm claude --prompt task.txt --allowedTools "Bash,Edit"
 ```
 
 ## How It Works
